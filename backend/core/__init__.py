@@ -1,0 +1,1 @@
+# BookRevive core package

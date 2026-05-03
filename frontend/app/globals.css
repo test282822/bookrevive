@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-serif: "DM Serif Display", Georgia, serif;
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --ink: #0d0d0d;
+  --parchment: #f5f0e8;
+  --amber: #c8860a;
+  --amber-light: #f0a830;
+  --stone: #1c1917;
+  --stone-mid: #292524;
+}
+
+/* Smooth iOS scroll */
+html {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Remove tap highlight on iOS */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Upload zone drag states */
+.upload-zone {
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.upload-zone.drag-over {
+  border-color: var(--amber);
+  background-color: rgba(200, 134, 10, 0.08);
+}
+
+/* Progress shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, #292524 25%, #3c3230 50%, #292524 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Page fade in */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up {
+  animation: fadeUp 0.4s ease forwards;
+}
+
+/* Safe area for iPhone home bar */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 1.5rem);
+}

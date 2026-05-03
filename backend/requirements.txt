@@ -1,0 +1,15 @@
+# BookRevive Backend — Python dependencies
+# Existing pipeline dependencies
+pytesseract>=0.3.10
+Pillow>=10.0.0
+opencv-python-headless>=4.9.0
+numpy>=1.26.0
+anthropic>=0.30.0
+pyspellchecker>=0.8.1
+markdown>=3.6
+watchdog>=4.0.0
+
+# FastAPI layer (new)
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
