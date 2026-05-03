@@ -50,7 +50,7 @@ app = FastAPI(
 # Allow Vercel frontend origin — update this to your Vercel URL after deploy
 ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    os.environ.get("FRONTEND_URL", "https://bookrevive.vercel.app"),
+    os.environ.get("FRONTEND_URL", "https://bookrevive-ten.vercel.app"),
 ]
 
 app.add_middleware(
