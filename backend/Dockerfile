@@ -1,14 +1,15 @@
 FROM python:3.11-slim
 
-# Install system dependencies — Tesseract and Calibre
+# Install system dependencies — Tesseract and Calibre via apt
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-eng \
     libgl1 \
     libglib2.0-0 \
-    wget \
-    xz-utils \
-    && wget -nv -O- https://download.calibre-ebook.com/linux-installer.sh | sh /dev/stdin \
+    libfontconfig1 \
+    libxrender1 \
+    libxext6 \
+    calibre \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
