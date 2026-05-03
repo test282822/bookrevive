@@ -47,16 +47,11 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Allow Vercel frontend origin — update this to your Vercel URL after deploy
-ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    os.environ.get("FRONTEND_URL", "https://bookrevive-ten.vercel.app"),
-]
-
+# CORS — open during testing, lock down after launch
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
