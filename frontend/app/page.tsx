@@ -1,7 +1,7 @@
 "use client";
 
-import { useUser, SignInButton, SignOutButton } from "@clerk/nextjs";
-import { useState, useRef, useCallback } from "react";
+import { useUser, SignInButton, SignOutButton, useAuth } from "@clerk/nextjs";
+import { useState, useCallback } from "react";
 import UploadZone from "@/components/UploadZone";
 import ProcessingCard from "@/components/ProcessingCard";
 import ResultCard from "@/components/ResultCard";
@@ -11,6 +11,7 @@ type Stage = "idle" | "processing" | "done" | "error";
 
 export default function Home() {
   const { isSignedIn, user, isLoaded } = useUser();
+  const { getToken } = useAuth();
   const [files, setFiles] = useState<File[]>([]);
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
@@ -27,8 +28,13 @@ export default function Home() {
     setError(null);
 
     try {
-      // Get Clerk session token
-      const token = await (window as any).Clerk?.session?.getToken();
+      // Get Clerk session token properly via useAuth hook
+      let token: string | null = null;
+      try {
+        token = await getToken();
+      } catch {
+        // Continue without token — backend will still process
+      }
 
       const form = new FormData();
       files.forEach((f) => form.append("files", f));
@@ -40,10 +46,13 @@ export default function Home() {
       if (token) headers["Authorization"] = `Bearer ${token}`;
       if (apiKey.trim()) headers["X-Anthropic-Key"] = apiKey.trim();
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/process`,
-        { method: "POST", body: form, headers }
-      );
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://bookrevive.onrender.com";
+
+      const res = await fetch(`${apiUrl}/process`, {
+        method: "POST",
+        body: form,
+        headers,
+      });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -60,7 +69,7 @@ export default function Home() {
       setError(err.message || "Something went wrong.");
       setStage("error");
     }
-  }, [files, title, author, apiKey]);
+  }, [files, title, author, apiKey, getToken]);
 
   const handleReset = () => {
     setFiles([]);
@@ -109,9 +118,6 @@ export default function Home() {
         </div>
       </header>
 
-      {/* AD SLOT — top inline (enable when AdSense approved) */}
-      {/* <div className="my-4 h-14 bg-stone-900 rounded-xl flex items-center justify-center text-stone-700 text-xs">Ad</div> */}
-
       <div className="mt-6 space-y-5">
         {stage === "idle" && (
           <>
@@ -151,7 +157,7 @@ export default function Home() {
                 {!isSignedIn && (
                   <div className="bg-stone-900 border border-stone-700 rounded-xl p-4 text-center">
                     <p className="text-stone-400 text-sm mb-3">
-                      Sign in to process books and use your Anthropic key for better OCR on hard-to-read pages.
+                      Sign in to process books and use your Anthropic key for better OCR.
                     </p>
                     <SignInButton mode="modal">
                       <button className="bg-amber-500 text-stone-950 font-semibold rounded-full px-6 py-2 text-sm active:bg-amber-400">
@@ -200,9 +206,6 @@ export default function Home() {
           </div>
         )}
       </div>
-
-      {/* AD SLOT — bottom inline */}
-      {/* <div className="mt-8 h-14 bg-stone-900 rounded-xl flex items-center justify-center text-stone-700 text-xs">Ad</div> */}
 
       <footer className="mt-12 text-center text-stone-700 text-xs pb-safe">
         BookRevive — open source on GitHub
