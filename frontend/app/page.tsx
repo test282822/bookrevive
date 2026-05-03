@@ -12,6 +12,7 @@ type Stage = "idle" | "processing" | "done" | "error";
 export default function Home() {
   const { isSignedIn, user, isLoaded } = useUser();
   const { getToken } = useAuth();
+
   const [files, setFiles] = useState<File[]>([]);
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
@@ -21,20 +22,23 @@ export default function Home() {
   const [epubName, setEpubName] = useState("book.epub");
   const [error, setError] = useState<string | null>(null);
 
+  // Progress state
+  const [currentPage, setCurrentPage] = useState(0);
+  const [currentStatus, setCurrentStatus] = useState("");
+  const [completedPages, setCompletedPages] = useState<number[]>([]);
+
   const handleProcess = useCallback(async () => {
     if (!files.length || !title.trim()) return;
 
     setStage("processing");
     setError(null);
+    setCurrentPage(0);
+    setCurrentStatus("Starting...");
+    setCompletedPages([]);
 
     try {
-      // Get Clerk session token properly via useAuth hook
       let token: string | null = null;
-      try {
-        token = await getToken();
-      } catch {
-        // Continue without token — backend will still process
-      }
+      try { token = await getToken(); } catch {}
 
       const form = new FormData();
       files.forEach((f) => form.append("files", f));
@@ -59,12 +63,67 @@ export default function Home() {
         throw new Error(data.detail || `Server error ${res.status}`);
       }
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const slug = title.toLowerCase().replace(/\s+/g, "-").replace(/[^\w-]/g, "");
-      setEpubUrl(url);
-      setEpubName(`${slug}.epub`);
+      // Read the SSE stream
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let sessionId = "";
+      let slug = "";
+      let filename = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+
+            if (event.type === "progress") {
+              setCurrentPage(event.page);
+              setCurrentStatus(event.status);
+            }
+
+            if (event.type === "page_done") {
+              setCompletedPages(prev => [...prev, event.page]);
+            }
+
+            if (event.type === "warning") {
+              console.warn(event.message);
+            }
+
+            if (event.type === "error") {
+              throw new Error(event.message);
+            }
+
+            if (event.type === "done") {
+              sessionId = event.session_id;
+              slug = event.slug;
+              filename = event.filename;
+            }
+          } catch (parseErr: any) {
+            if (parseErr.message && !parseErr.message.includes("JSON")) {
+              throw parseErr;
+            }
+          }
+        }
+      }
+
+      if (!sessionId || !filename) {
+        throw new Error("Processing completed but no file was generated.");
+      }
+
+      // Build download URL pointing to backend
+      const downloadUrl = `${apiUrl}/download/${sessionId}/${filename}`;
+      setEpubUrl(downloadUrl);
+      setEpubName(filename);
       setStage("done");
+
     } catch (err: any) {
       setError(err.message || "Something went wrong.");
       setStage("error");
@@ -78,6 +137,9 @@ export default function Home() {
     setStage("idle");
     setEpubUrl(null);
     setError(null);
+    setCompletedPages([]);
+    setCurrentPage(0);
+    setCurrentStatus("");
   };
 
   if (!isLoaded) {
@@ -90,7 +152,6 @@ export default function Home() {
 
   return (
     <div className="fade-up">
-      {/* Header */}
       <header className="sticky top-0 z-20 bg-stone-950/90 backdrop-blur border-b border-stone-800 px-4 py-3 flex items-center justify-between -mx-4">
         <div>
           <h1 className="font-serif text-xl text-amber-400 leading-none">BookRevive</h1>
@@ -126,9 +187,7 @@ export default function Home() {
             {files.length > 0 && (
               <div className="space-y-3 fade-up">
                 <div>
-                  <label className="text-xs text-stone-400 uppercase tracking-wider block mb-1.5">
-                    Book Title *
-                  </label>
+                  <label className="text-xs text-stone-400 uppercase tracking-wider block mb-1.5">Book Title *</label>
                   <input
                     type="text"
                     placeholder="e.g. Oliver Twist"
@@ -138,9 +197,7 @@ export default function Home() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-stone-400 uppercase tracking-wider block mb-1.5">
-                    Author
-                  </label>
+                  <label className="text-xs text-stone-400 uppercase tracking-wider block mb-1.5">Author</label>
                   <input
                     type="text"
                     placeholder="e.g. Charles Dickens"
@@ -150,15 +207,11 @@ export default function Home() {
                   />
                 </div>
 
-                {isSignedIn && (
-                  <ApiKeyInput value={apiKey} onChange={setApiKey} />
-                )}
+                {isSignedIn && <ApiKeyInput value={apiKey} onChange={setApiKey} />}
 
                 {!isSignedIn && (
                   <div className="bg-stone-900 border border-stone-700 rounded-xl p-4 text-center">
-                    <p className="text-stone-400 text-sm mb-3">
-                      Sign in to process books and use your Anthropic key for better OCR.
-                    </p>
+                    <p className="text-stone-400 text-sm mb-3">Sign in to process books.</p>
                     <SignInButton mode="modal">
                       <button className="bg-amber-500 text-stone-950 font-semibold rounded-full px-6 py-2 text-sm active:bg-amber-400">
                         Sign in to continue
@@ -181,7 +234,14 @@ export default function Home() {
           </>
         )}
 
-        {stage === "processing" && <ProcessingCard pageCount={files.length} />}
+        {stage === "processing" && (
+          <ProcessingCard
+            pageCount={files.length}
+            currentPage={currentPage}
+            currentStatus={currentStatus}
+            completedPages={completedPages}
+          />
+        )}
 
         {stage === "done" && epubUrl && (
           <ResultCard
